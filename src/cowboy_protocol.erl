@@ -50,6 +50,7 @@
 
 %% API.
 -export([start_link/4]).
+-export([begin_protocol/4]).
 
 %% Internal.
 -export([init/4]).
@@ -98,6 +99,10 @@ start_link(Ref, Socket, Transport, Opts) ->
 	Pid = spawn_link(?MODULE, init, [Ref, Socket, Transport, Opts]),
 	{ok, Pid}.
 
+-spec begin_protocol(ranch:ref(), inet:socket(), module(), opts()) -> ok.
+begin_protocol(Ref, Socket, Transport, Opts) ->
+	entry(Ref, Socket, Transport, Opts).
+
 %% Internal.
 
 %% @doc Faster alternative to proplists:get_value/3.
@@ -111,6 +116,11 @@ get_value(Key, Opts, Default) ->
 %% @private
 -spec init(ranch:ref(), inet:socket(), module(), opts()) -> ok.
 init(Ref, Socket, Transport, Opts) ->
+	ok = ranch:accept_ack(Ref),
+	entry(Ref, Socket, Transport, Opts).
+
+-spec entry(ranch:ref(), inet:socket(), module(), opts()) -> ok.
+entry(Ref, Socket, Transport, Opts) ->
 	Compress = get_value(compress, Opts, false),
 	MaxEmptyLines = get_value(max_empty_lines, Opts, 5),
 	MaxHeaderNameLength = get_value(max_header_name_length, Opts, 64),
@@ -123,7 +133,6 @@ init(Ref, Socket, Transport, Opts) ->
 	OnRequest = get_value(onrequest, Opts, undefined),
 	OnResponse = get_value(onresponse, Opts, undefined),
 	Timeout = get_value(timeout, Opts, 5000),
-	ok = ranch:accept_ack(Ref),
 	wait_request(<<>>, #state{socket=Socket, transport=Transport,
 		middlewares=Middlewares, compress=Compress, env=Env,
 		max_empty_lines=MaxEmptyLines, max_keepalive=MaxKeepalive,
